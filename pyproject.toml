@@ -1,0 +1,15 @@
+[project]
+name = "11labs"
+description = "ComfyUI ElevenLabs TTS Node - Text-to-speech integration with advanced voice controls"
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["requests>=2.25.0","torch>=2.0.0","torchaudio>=2.0.0"]
+
+[project.urls]
+Repository = "https://github.com/gabe-init/ComfyUI-11labs"
+# Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "gabe-init"
+DisplayName = "ComfyUI-11labs"
+Icon = ""
