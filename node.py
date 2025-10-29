@@ -96,86 +96,86 @@ class ElevenLabsNode:
             return tensor.squeeze().unsqueeze(0)
         return tensor
 
-def generate_speech(self, api_key, text, voice, model,
-                    stability, similarity_boost, style,
-                    use_speaker_boost, input_text=None, input_audio=None):
+    def generate_speech(self, api_key, text, voice, model,
+                        stability, similarity_boost, style,
+                        use_speaker_boost, input_text=None, input_audio=None):
 
-    final_text = input_text if input_text is not None else text
-    voice_id = voice.split("(")[-1].strip(")")
+        final_text = input_text if input_text is not None else text
+        voice_id = voice.split("(")[-1].strip(")")
 
-    headers = {"xi-api-key": api_key}
+        headers = {"xi-api-key": api_key}
 
-    # --- SPEECH TO SPEECH ---
-    if input_audio is not None:
-        url = f"https://api.elevenlabs.io/v1/speech-to-speech/{voice_id}"
-        input_waveform = self.ensure_3d_tensor(input_audio["waveform"])
+        # --- SPEECH TO SPEECH ---
+        if input_audio is not None:
+            url = f"https://api.elevenlabs.io/v1/speech-to-speech/{voice_id}"
+            input_waveform = self.ensure_3d_tensor(input_audio["waveform"])
 
-        # Save to temporary WAV file instead of BytesIO
-        with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
-            torchaudio.save(tmp.name, input_waveform.squeeze(0), input_audio["sample_rate"], format="wav")
-            tmp.seek(0)
-            waveform, sample_rate = torchaudio.load(tmp.name)
-
-        files = {"audio": ("input.wav", open(tmp.name, "rb"), "audio/wav")}
-        data = {
-            "model_id": model,
-            "voice_settings": json.dumps({
-                "stability": stability,
-                "similarity_boost": similarity_boost,
-                "style": style,
-                "use_speaker_boost": use_speaker_boost
-            })
-        }
-
-        try:
-            response = requests.post(url, headers=headers, data=data, files=files)
-        except requests.exceptions.RequestException as e:
-            print(f"Error in speech-to-speech: {str(e)}")
-            return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": input_audio["sample_rate"]},)
-        finally:
-            files["audio"].close()
-
-    # --- TEXT TO SPEECH ---
-    else:
-        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-        payload = {
-            "text": final_text,
-            "model_id": model,
-            "voice_settings": {
-                "stability": stability,
-                "similarity_boost": similarity_boost,
-                "style": style,
-                "use_speaker_boost": use_speaker_boost
-            }
-        }
-
-        try:
-            response = requests.post(url, headers={**headers, "Content-Type": "application/json"}, json=payload)
-        except requests.exceptions.RequestException as e:
-            print(f"Error in text-to-speech: {str(e)}")
-            return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": 44100},)
-
-    # --- Handle response ---
-    if response.status_code == 200:
-        # Save API response to temp WAV file and load it
-        with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
-            tmp.write(response.content)
-            tmp.seek(0)
-            try:
+            # Save to temporary WAV file instead of BytesIO
+            with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+                torchaudio.save(tmp.name, input_waveform.squeeze(0), input_audio["sample_rate"], format="wav")
+                tmp.seek(0)
                 waveform, sample_rate = torchaudio.load(tmp.name)
-            except Exception as e:
-                print(f"Error decoding audio: {str(e)}")
+
+            files = {"audio": ("input.wav", open(tmp.name, "rb"), "audio/wav")}
+            data = {
+                "model_id": model,
+                "voice_settings": json.dumps({
+                    "stability": stability,
+                    "similarity_boost": similarity_boost,
+                    "style": style,
+                    "use_speaker_boost": use_speaker_boost
+                })
+            }
+
+            try:
+                response = requests.post(url, headers=headers, data=data, files=files)
+            except requests.exceptions.RequestException as e:
+                print(f"Error in speech-to-speech: {str(e)}")
+                return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": input_audio["sample_rate"]},)
+            finally:
+                files["audio"][1].close()
+
+        # --- TEXT TO SPEECH ---
+        else:
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            payload = {
+                "text": final_text,
+                "model_id": model,
+                "voice_settings": {
+                    "stability": stability,
+                    "similarity_boost": similarity_boost,
+                    "style": style,
+                    "use_speaker_boost": use_speaker_boost
+                }
+            }
+
+            try:
+                response = requests.post(url, headers={**headers, "Content-Type": "application/json"}, json=payload)
+            except requests.exceptions.RequestException as e:
+                print(f"Error in text-to-speech: {str(e)}")
                 return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": 44100},)
 
-        waveform = self.ensure_3d_tensor(waveform)
-        if waveform.dtype != torch.float32:
-            waveform = waveform.float() / torch.iinfo(waveform.dtype).max
+        # --- Handle response ---
+        if response.status_code == 200:
+            # Save API response to temp WAV file and load it
+            with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+                tmp.write(response.content)
+                tmp.seek(0)
+                try:
+                    waveform, sample_rate = torchaudio.load(tmp.name)
+                except Exception as e:
+                    print(f"Error decoding audio: {str(e)}")
+                    return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": 44100},)
 
-        return ({"waveform": waveform, "sample_rate": sample_rate},)
+            waveform = self.ensure_3d_tensor(waveform)
+            if waveform.dtype != torch.float32:
+                waveform = waveform.float() / torch.iinfo(waveform.dtype).max
 
-    else:
-        print(f"API Error: {response.status_code} - {response.text}")
-        return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": 44100},)
+            return ({"waveform": waveform, "sample_rate": sample_rate},)
+
+        else:
+            print(f"API Error: {response.status_code} - {response.text}")
+            return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": 44100},)
 
     @classmethod
     def IS_CHANGED(cls, api_key, text, voice, model,
