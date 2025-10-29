@@ -5,6 +5,7 @@ import io
 import torch
 import torchaudio
 import tempfile
+import os
 
 class ElevenLabsNode:
     voices_cache = None
@@ -111,12 +112,11 @@ class ElevenLabsNode:
             input_waveform = self.ensure_3d_tensor(input_audio["waveform"])
 
             # Save to temporary WAV file instead of BytesIO
-            with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                 torchaudio.save(tmp.name, input_waveform.squeeze(0), input_audio["sample_rate"], format="wav")
-                tmp.seek(0)
-                waveform, sample_rate = torchaudio.load(tmp.name)
+                tmp_path = tmp.name
 
-            files = {"audio": ("input.wav", open(tmp.name, "rb"), "audio/wav")}
+            files = {"audio": ("input.wav", open(tmp_path, "rb"), "audio/wav")}
             data = {
                 "model_id": model,
                 "voice_settings": json.dumps({
@@ -134,6 +134,7 @@ class ElevenLabsNode:
                 return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": input_audio["sample_rate"]},)
             finally:
                 files["audio"][1].close()
+                os.remove(tmp_path)
 
         # --- TEXT TO SPEECH ---
         else:
