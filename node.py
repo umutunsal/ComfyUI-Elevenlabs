@@ -25,6 +25,7 @@ class ElevenLabsNode:
                 "api_key": ("STRING", {"multiline": False, "default": ""}),
                 "text": ("STRING", {"multiline": True, "default": "Hello, how are you?"}),
                 "voice": (voices,),
+                "custom_voice_id": ("STRING", {"multiline": False, "default": ""}),
                 "model": (models,),
                 "stability": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1}),
                 "similarity_boost": ("FLOAT", {"default": 0.8, "min": 0.0, "max": 1.0, "step": 0.1}),
@@ -97,12 +98,16 @@ class ElevenLabsNode:
             return tensor.squeeze().unsqueeze(0)
         return tensor
 
-    def generate_speech(self, api_key, text, voice, model,
+    def generate_speech(self, api_key, text, voice, custom_voice_id, model,
                         stability, similarity_boost, style,
                         use_speaker_boost, input_text=None, input_audio=None):
 
         final_text = input_text if input_text is not None else text
-        voice_id = voice.split("(")[-1].strip(")")
+        
+        if custom_voice_id and custom_voice_id.strip():
+            voice_id = custom_voice_id.strip()
+        else:
+            voice_id = voice.split("(")[-1].strip(")")
 
         headers = {"xi-api-key": api_key}
 
@@ -179,10 +184,10 @@ class ElevenLabsNode:
             return ({"waveform": torch.zeros(1, 1, 1).float(), "sample_rate": 44100},)
 
     @classmethod
-    def IS_CHANGED(cls, api_key, text, voice, model,
+    def IS_CHANGED(cls, api_key, text, voice, custom_voice_id, model,
                    stability, similarity_boost, style,
                    use_speaker_boost, input_text=None, input_audio=None):
-        return (api_key, text, voice, model, stability,
+        return (api_key, text, voice, custom_voice_id, model, stability,
                 similarity_boost, style, use_speaker_boost, input_text, input_audio)
 
 # Node registration for ComfyUI
